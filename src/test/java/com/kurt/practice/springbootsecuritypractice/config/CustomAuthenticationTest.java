@@ -1,6 +1,8 @@
 package com.kurt.practice.springbootsecuritypractice.config;
 
 import com.kurt.practice.springbootsecuritypractice.controller.HelloController;
+import jdk.jfr.Enabled;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +18,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Import({UserManagementConfig.class, WebAuthorizationConfig.class, CustomAuthenticationProvider.class})
 @WebMvcTest(HelloController.class)
+@Disabled
 public class CustomAuthenticationTest {
 
     @Autowired
     private MockMvc mvc;
-
     @Test
     @DisplayName("Test calling /hello endpoint authenticating with valid credentials returns ok.")
     public void helloAuthenticatingWithValidUser() throws Exception {
