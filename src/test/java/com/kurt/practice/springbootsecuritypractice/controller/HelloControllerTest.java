@@ -1,21 +1,20 @@
 package com.kurt.practice.springbootsecuritypractice.controller;
 
-import com.kurt.practice.springbootsecuritypractice.config.SecurityConfig;
+import com.kurt.practice.springbootsecuritypractice.config.UserManagementConfig;
+import com.kurt.practice.springbootsecuritypractice.config.WebAuthorizaionConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import(SecurityConfig.class)
+@Import({UserManagementConfig.class, WebAuthorizaionConfig.class})
 @WebMvcTest(HelloController.class)
 class HelloControllerTest {
 
