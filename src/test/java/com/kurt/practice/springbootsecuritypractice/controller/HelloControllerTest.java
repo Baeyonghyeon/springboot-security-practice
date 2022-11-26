@@ -1,7 +1,8 @@
 package com.kurt.practice.springbootsecuritypractice.controller;
 
+import com.kurt.practice.springbootsecuritypractice.config.CustomAuthenticationProvider;
 import com.kurt.practice.springbootsecuritypractice.config.UserManagementConfig;
-import com.kurt.practice.springbootsecuritypractice.config.WebAuthorizaionConfig;
+import com.kurt.practice.springbootsecuritypractice.config.WebAuthorizationConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Import({UserManagementConfig.class, WebAuthorizaionConfig.class})
+@Import({UserManagementConfig.class, WebAuthorizationConfig.class, CustomAuthenticationProvider.class})
 @WebMvcTest(HelloController.class)
 class HelloControllerTest {
 
