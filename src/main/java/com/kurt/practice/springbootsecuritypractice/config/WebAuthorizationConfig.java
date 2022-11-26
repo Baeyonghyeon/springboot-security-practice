@@ -1,18 +1,21 @@
 package com.kurt.practice.springbootsecuritypractice.config;
 
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
-public class WebAuthorizaionConfig {
+@Configuration
+public class WebAuthorizationConfig {
 
     @Bean
     protected SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .authorizeHttpRequests(authz ->
-                        authz.anyRequest().authenticated())
+                .authorizeHttpRequests(authz -> authz
+                        .anyRequest().authenticated())
                 .httpBasic();
 
         return http.build();
     }
+
 }
