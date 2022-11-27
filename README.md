@@ -47,4 +47,7 @@ public interface UserDetailsService {
 - 메서드를 호출해 주어진 사용자 이름을 가진 사용자의 정보를 얻는다.
 - 물론 반환되는 값은 UserDetails 계약의 구현이다.
 - 아키텍처 이미지를 보면 AuthenticationProvider는 인증 논리에서 UserDetailsService를 통해 사용자 세부 정보를 로드한다.
+- 추가로 확장을 원할땐 UserDetailsManager interface를 구현하면 된다. 사용자 생성, 변경 삭제와 관련된 동작을 추가할 수 있다.
+- 스프링 시큐리티는 UserDetailsManager 계약의 여러 구현을 제공한다. 이러한 구현에는 InMemoryUserDetailsManager, JdbcUserDetailsManager, LdapUserDetailsManager가 있다.
+- JdbcUserDetailsManager는 JDBC를 직접 이용하므로 애플리케이션이 다른 프레임워크에 고정되지 않는다는 이점이 있다.(91p. 추후 구현)
 
