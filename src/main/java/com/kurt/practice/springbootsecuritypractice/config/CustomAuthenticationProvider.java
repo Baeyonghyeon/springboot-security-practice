@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
-@Component
+//@Component
 public class CustomAuthenticationProvider implements AuthenticationProvider {
     /**
      * 인증 논리를 추가할 위치

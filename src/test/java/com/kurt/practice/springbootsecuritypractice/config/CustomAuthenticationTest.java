@@ -1,6 +1,8 @@
 package com.kurt.practice.springbootsecuritypractice.config;
 
 import com.kurt.practice.springbootsecuritypractice.controller.HelloController;
+import jdk.jfr.Enabled;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,11 +18,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Import({UserManagementConfig.class, WebAuthorizationConfig.class, CustomAuthenticationProvider.class})
 @WebMvcTest(HelloController.class)
+@DisplayName("AuthenticationProivder가 어떻게 동작하는지 간단하게 확인했고 CustomAuthenticationProvider를 적용해보았으로 제외")
+@Disabled
 public class CustomAuthenticationTest {
 
     @Autowired
     private MockMvc mvc;
-
     @Test
     @DisplayName("Test calling /hello endpoint authenticating with valid credentials returns ok.")
     public void helloAuthenticatingWithValidUser() throws Exception {
