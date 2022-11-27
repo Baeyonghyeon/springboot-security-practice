@@ -1,29 +1,25 @@
 package com.kurt.practice.springbootsecuritypractice.config;
 
+import com.kurt.practice.springbootsecuritypractice.model.User;
+import com.kurt.practice.springbootsecuritypractice.services.InMemoryUserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
-import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+
+import java.util.List;
 
 @Configuration
 public class UserManagementConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        UserDetailsService userDetailsService = new InMemoryUserDetailsManager();
+        UserDetails user = new User("kurt", "12345", "read");
+        List<UserDetails> users = List.of(user);
 
-        User user = (User) User.withUsername("kurt")
-                .password("12345")
-                .authorities("read")
-                .build();
-
-        ((InMemoryUserDetailsManager) userDetailsService).createUser(user);
-
-        return userDetailsService;
+        return new InMemoryUserDetailsService(users);
     }
 
     @Bean
