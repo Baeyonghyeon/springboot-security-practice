@@ -18,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @Import({UserManagementConfig.class, WebAuthorizationConfig.class, CustomAuthenticationProvider.class})
 @WebMvcTest(HelloController.class)
+@DisplayName("AuthenticationProivder가 어떻게 동작하는지 간단하게 확인했고 CustomAuthenticationProvider를 적용해보았으로 제외")
 @Disabled
 public class CustomAuthenticationTest {
 
