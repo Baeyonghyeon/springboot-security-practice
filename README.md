@@ -4,8 +4,8 @@
 ## Security 5.4.0 이후 변화 (WebSecurityConfigurerAdapter 안쓰게 되면서)
 - [Authorize HttpServletRequests 로 변경](https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html)
 - [Enable Logging for Spring Security](https://www.baeldung.com/spring-security-enable-logging)
-- [참고 래퍼런스](https://www.baeldung.com/category/spring/spring-security)
-- 
+- [Spring Security reference category](https://www.baeldung.com/category/spring/spring-security)
+- [Spring Security junit5 test reference](https://docs.spring.io/spring-security/reference/servlet/test/method.html)
 
 ## Security 필터 설정
 - anyRequest().authenticated()
@@ -41,7 +41,7 @@ UserDetails u1 = builder1
 ```
 public interface UserDetailsService {
 
-  UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
+    UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
 }
 ```
 - 메서드를 호출해 주어진 사용자 이름을 가진 사용자의 정보를 얻는다.
@@ -51,3 +51,56 @@ public interface UserDetailsService {
 - 스프링 시큐리티는 UserDetailsManager 계약의 여러 구현을 제공한다. 이러한 구현에는 InMemoryUserDetailsManager, JdbcUserDetailsManager, LdapUserDetailsManager가 있다.
 - JdbcUserDetailsManager는 JDBC를 직접 이용하므로 애플리케이션이 다른 프레임워크에 고정되지 않는다는 이점이 있다.(91p. 추후 구현)
 
+## PasswordEncoder
+- passwordEncoder interface 는 두개의 추상 메서드와 기본 구현이 있는 메서드 하나를 정의한다.
+```
+public interface PasswordEncoder {
+    // 문자열을 변환해 반환한다. 즉, 암호의 해시를 제공하거나 암호화를 수행하는 일을 한다.
+    String encode(CharSequence rawPassword);
+
+    // 인코딩된 문자열이 원시 암호와 일치하는지 확인
+    // 지정된 암호를 인증 프로세스에서 알려진 자격 증명의 집합을 대상으로 비교한다.
+    boolean matches(CharSequence rawPassword, String encodedPassword);
+
+    // true를 반환하도록 재정의하면 인코딩된 암호를 보안향상을 위해 다시 인코딩한다.
+    default boolean upgradeEncoding(String encodedPassword) {
+        return false;
+    }
+}
+```
+- 직접 구현해도 되지만 스프링에서 제공된 구현을 선택해도 된다. (각 암호 구현 내용들 : 101p.)
+  - NoOpPasswordEncoder : 암호 인코딩 하지 않고 일반 텍스트로 유지 **(실제 시나리오 사용X)** 
+  - StandardPasswordEncoder : SHA-256 사용. **(이 구현은 이제 구식이므로 사용X)**
+  - Pbkdf2PasswordEncoder : PBKDF2를 사용.
+  - BCryptPasswordEncoder : bcrypt 강력 해싱 함수로 인코딩.
+  - SCryptPasswordEncoder : scrypt 해싱 함수로 인코딩
+
+## DelegatingPasswordEncoder를 이용한 여러 인코딩 전략
+- 운영 단계에서 일반적인 시나리오는 특정 애플리케이션 버전부터 인코딩 알고리즘이 변경된 경우이다.
+```
+@Configuration
+public class ProjectConfig {
+    
+    // ...생략
+    
+    @Bean
+    public PasswordEncoder passwordEncoder(){
+        Map<String, PasswordEncoder> encoders = new HashMap<>();
+        
+        encoders.put("noop", NoOpPasswordEncoder.getInstance());
+        encoders.put("bcrypt", new BCryptPasswordEncoder());
+        encoders.put("scrypt", new SCryptPasswordEncoder());
+        
+        return new DelegatingPasswordEncoder("bcrypt", encoders);
+    }
+}
+```
+- 접두사를 기준으로 올바른 PasswordEncoder 구현을 선택한다. 접두사가 없으면 `DelegatingPasswordEncoder`는 기본 인코더를 이용하며 위 코드는 `bcrypt`를 사용했다.
+- 암호인코더는 아래 처럼 생겼다. 
+```text
+{bcrypt}@&2xoni#NnuibA/#dau1$@abic...
+```
+- 지금까지 설명을 위해 썼지만 PasswordEncoderFactories 클래스에서 정적 메소드를 지원해준다.
+```
+PasswordEncoder passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+```
