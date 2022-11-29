@@ -18,13 +18,13 @@
 ## UserDetails
 - **절대 주의! :** JPA 엔티티 클래스와 UserDetails와 하나의 클래스로 만들지 않는다. 하나의클래스는 한개의 책임만 같도록 구성한다. (80p.) 
 - User 를 만들려면 UserDetails를 구현하면 된다.    
-```
+```java
 public class User implements UserDetails {
-  ...생략
-}
+    //  ...생략
+} 
 ```
 - 빌더 클래스로 만들수도 있다.
-```
+```java
 User.UserBuilder builder1 = User.withUsername("kurt"); // 우선 주어진 사용자 이름으로 사용자 생
 
 UserDetails u1 = builder1
@@ -33,12 +33,12 @@ UserDetails u1 = builder1
                  .passwordEncoder(p -> encode(p)) // 함호 인코더는 인코딩을 수행하는 함수 일뿐.
                  .accountExpired(false)
                  .disabled(true)
-                 .build()
+                 .build();
 ```
 
 ## UserDetailsService
 - UserDetailsService.interface 는 한 메서드만 포함한다.
-```
+```java
 public interface UserDetailsService {
 
     UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
@@ -53,7 +53,7 @@ public interface UserDetailsService {
 
 ## PasswordEncoder
 - passwordEncoder interface 는 두개의 추상 메서드와 기본 구현이 있는 메서드 하나를 정의한다.
-```
+```java
 public interface PasswordEncoder {
     // 문자열을 변환해 반환한다. 즉, 암호의 해시를 제공하거나 암호화를 수행하는 일을 한다.
     String encode(CharSequence rawPassword);
@@ -77,7 +77,7 @@ public interface PasswordEncoder {
 
 ## DelegatingPasswordEncoder를 이용한 여러 인코딩 전략
 - 운영 단계에서 일반적인 시나리오는 특정 애플리케이션 버전부터 인코딩 알고리즘이 변경된 경우이다.
-```
+```java
 @Configuration
 public class ProjectConfig {
     
@@ -101,6 +101,26 @@ public class ProjectConfig {
 {bcrypt}@&2xoni#NnuibA/#dau1$@abic...
 ```
 - 지금까지 설명을 위해 썼지만 PasswordEncoderFactories 클래스에서 정적 메소드를 지원해준다.
-```
+```java
 PasswordEncoder passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
 ```
+
+## KeyGenerator 키 생성기 이용
+- 키 생성기는 특별한 종류의 키를 생성하는 객체로서 일반적으로 암호화나 해싱 알고리즘에 필요하다.
+-`BytesKeyGenerator` 및 `StringKeyGenerator`는 키 생성기의 두 가지 유형을 나타내는 인터페이스 이며 팩터리 클래스 `KeyGenerators`로 직접 만들 수 있다.
+- `StringKeyGenerator` 계약의 정의는 다음과 같다.
+```java
+public interface StringKeyGenerator {
+    // 생성기는 키 값을 나타내는 문자열 하나를 반환하는 메서드
+    String generateKey();
+}
+```
+- 다음 코드는 `StringKeyGenerator` 인스턴스를 얻고 솔트 값을 가져오는 방법이다.
+```java
+// 해당 생성기는 8바이트 키를 생성하고 이를 16진수 문자열로 인코딩하며 메서드는 이러한 작업의 결과를 문자열로 반환한다.
+StringKeyGenerator keyGenerator = keyGenerators.string();
+String salt = keyGenerator.generateKey();
+```
+`BytesKeyGenerator` 인터페이스 및 복호화 작업은 추후 추가.(109p.)
+
+## 
