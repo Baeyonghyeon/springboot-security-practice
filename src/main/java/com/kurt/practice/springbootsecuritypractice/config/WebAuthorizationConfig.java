@@ -14,6 +14,7 @@ public class WebAuthorizationConfig {
                 .authorizeHttpRequests(authz -> authz
                         .anyRequest().authenticated())
                 .httpBasic();
+        
 
         return http.build();
     }
