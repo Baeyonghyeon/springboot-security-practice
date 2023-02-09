@@ -15,6 +15,10 @@ public class WebAuthorizationConfig {
                         .anyRequest().authenticated())
                 .httpBasic();
 
+        http.httpBasic(c->
+                c.realmName("aaa")
+        );
+
         return http.build();
     }
 
