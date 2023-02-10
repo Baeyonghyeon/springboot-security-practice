@@ -123,6 +123,155 @@ String salt = keyGenerator.generateKey();
 ```
 `BytesKeyGenerator` 인터페이스 및 복호화 작업은 추후 추가.(109p.)
 
-##  
 
+
+# AuthenticationProvider 의 이해
+
+### 요청하는 엔티티가 인증되지 않는다.
+
+- 애플리케이션이 사용자를 인식하지 못해 권한 부여 프로세스에 위임 하지 않고 요청을 거절한다. 클라이언트에 보통 401 권한 없음을 반환한다.
+
+### 요청하는 엔티티가 인증된다.
+
+- 요청자의 세부 정보가 저장돼 있어 애플리케이션이 이를 권한 부여에 이용할 수 있다. 현재 인증된 요청에 대한 세부 정보는 SecurityContext 인터페이스의 인스턴스에 저장된다.
+
+엔터프라이즈 애플리케이션에는 사용자 이름과 암호 기반의 기본 인증 구현이 적합하지 않을 수 있다. 이게 무슨 뜻이냐 실제로 서비스에선 지문인증, sms 받아서 인증, 애플리케이션에 표시된 코드를 이용해 인증등 다른 방법의 인증들이 존재한다. 어떠한 시나리오가 나오더라도 구현 할 수 있게 해주는것이 프레임워크의 목적이다.
+
+스프링에선 AuthenticationProvider 계약으로 모든 시나리오를 구현할 수 있다. Authetication 인터페이스를 구현하고 AuthenticationProvider 로 맞춤형 인증 논리를 구축한다.
+
+## 맞춤형 인증 만들기
+
+```java
+@Component
+public class CustomAuthenticationProvider implements AuthenticationProvider {
+
+    @Autowired
+    private UserDetailsService userDetailsService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public Authentication authenticate(Authentication authentication) {
+        String username = authentication.getName();
+        String password = authentication.getCredentials().toString();
+
+        UserDetails u = userDetailsService.loadUserByUsername(username);
+        if (passwordEncoder.matches(password, u.getPassword())) {
+            return new UsernamePasswordAuthenticationToken(username, password, u.getAuthorities());
+        } else {
+						// BadCredentialsException은 AuthenticationException을 상속한다.
+            throw new BadCredentialsException("Something went wrong!");
+        }
+    }
+
+    @Override
+    public boolean supports(Class<?> authenticationType) {
+        return authenticationType.equals(UsernamePasswordAuthenticationToken.class);
+    }
+}
+```
+
+1. AuthenticationProvider 계약을 구현하는 클래스를 선언한다.
+2. 새 AuthenticationProvider가 어떤 종류의 Authentication 객체를 지원할지 결정한다.
+  1. 정의하는 AuthenticationProvider 가 지원하는 인증 유형을 나타내도록 supports 메서드를 재정의 한다.
+  2. authentication 메서드를 재정의해 인증 논리를 구현한다.
+3. 새 AuthenticationProvider 구현의 인스턴스를 스프링 시큐리티에 등록한다.
+
+만들었으니 구성 클래스에 AuthenticationProvider 를 등록해주기만 하면 된다.
+
+- [스프링 레퍼런스](https://www.baeldung.com/spring-security-authentication-provider)
+
+# SecurityContext
+AuthenticationManager는 인증 프로세스를 성공적으로 완료한 후 요청이 유지되는 동안 Authentication 인스턴스를 저장한다.
+Authentication 객체를 저장하는 인스턴스를 보안 컨텍스트라 부른다.
+
+## SecurityContext interface
+
+```java
+public interface SecurityContext extends Serializable {
+
+		Authentication getAuthentication();
+		void setAuthentication(Authentication authentication);
+}
+```
+
+위 계약 정의를 보면 SecurityContext의 주 책임은 Authentication 객체를 저장하는 것이다.
+그렇다면 SecurityContext 자체는 어떻게 관리될까?
+
+스프링 시큐리티는 관리자 역할을 하는 객체로 SecurityContext를 관리하는 세 가지 전략을 제공한다.
+이 객체를 SecurityContextHolder 라 부른다.
+
+- **MODE_THREADLOCAL**
+  - 각 스레드가 보안 컨텍스트에 각자의 세부 정보를 저장할 수 있게 해준다. 요청당 스레드 방식의 웹 애플리케이션에서는 각 요청이 개별 스레드를 가지므로 이는 일반적인 접근법이다.
+- **MODE_INHERITABLETHREADLOCAL**
+  - MODE_THREADLOCAL 과 비슷하지만 비동기 메서드의 경우 보안 컨텍스트를 다음 스레드로 복사하도록 스프링 시큐리티에 지시한다. 이 방식으로 @Async 메서드를 실행하는 새 스레드가 보안 컨텍스트를 상속하게 할 수 있다.
+
+    이 방식은 자체적으로 쓰레드를 만들게 되면 적용되지 않는다. 그 이유는 프레임워크가 코드에서 생성한 쓰레드에 대해 모르기 때문이다 → DelegatingSecurityContextRunnable로 보안 컨텍스트 전달 (책 131p. 참고)
+
+- **MODE_GLOBAL**
+  - 애플리케이션의 모든 스레드가 같은 보안 컨텍스트 인스턴스를 보게 한다.
+
+
+# AuthenticationEntryPoint
+인증이 실패했을 때의 응답을 맞춤 구성 하려면 `AuthenticationEntryPoint`를 구현하면 된다.
+
+`AuthenticationEntryPoint` 의 commence() 메서드는 `httpServletRequest` , `httpServletResponse`, 인증 실패를 일으킨 `AuthenticationException` 을 받는다.
+
+이 인터페이스는 스프링 시큐리티 아키텍처에서 `ExceptionTranslationManager` 라는 구성 요소에서 직접 사용되며, 그 구성 요소는 필터 체인에서 투척된 모든 AccessDeniedException, AuthenticationException 을 처리한다.
+
+## AuthenticationEntryPoint 구현
+
+```java
+public class CustomEntryPoint implements AuthenticationEntryPoint {
+
+    @Override
+    public void commence(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, AuthenticationException e) throws IOException {
+        httpServletResponse.addHeader("message", "너는 에러를 낸것이야");
+        httpServletResponse.sendError(HttpStatus.UNAUTHORIZED.value());
+    }
+}
+```
+
+구현을 했으니 HTTP Basic 인증을 위해 등록을 한다.
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic(c -> {
+            c.realmName("OTHER");
+            c.authenticationEntryPoint(new CustomEntryPoint());
+        });
+        http.authorizeRequests().anyRequest().authenticated();
+    }
+}
+```
+
+자바 17의 경우 WebSecurityConfigurerAdapter이 @Deprecated 되었기 때문에 `filterChain` 에 넣어주면 된다.
+
+## java 17 (Spring Security 5.7.0 이후) 적용
+```java
+@Configuration
+public class WebAuthorizationConfig {
+
+    @Bean
+    protected SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(authz -> authz
+                        .anyRequest().authenticated())
+                .httpBasic();
+
+        http.httpBasic(c->
+              c.realmName("aaa")
+	            c.authenticationEntryPoint(new CustomEntryPoint());
+        );
+
+        return http.build();
+    }
+
+}
+```
 
