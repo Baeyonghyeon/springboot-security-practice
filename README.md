@@ -273,6 +273,7 @@ public class WebAuthorizationConfig {
     }
 
 }
+
 ```
 ## 인증방식을 양식 기반 로그인으로 변경하고 싶으면..?
 
