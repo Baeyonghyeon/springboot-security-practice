@@ -274,4 +274,460 @@ public class WebAuthorizationConfig {
 
 }
 ```
+## 인증방식을 양식 기반 로그인으로 변경하고 싶으면..?
 
+httpBasic() 대신 formLogin() 메서드를 출력한다.
+
+```java
+@Configuration
+public class WebAuthorizationConfig {
+
+    @Bean
+    protected SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.authorizeHttpRequests(authz -> authz
+                        .anyRequest().authenticated())
+                .httpBasic();
+
+        http.formLogin();
+        http.authorizeRequests().anyRequest().authenticated();
+	
+        );
+
+        return http.build();
+    }
+
+}
+```
+로그인에 성공 했을 때의 논리를 맞춤 구성 하고 싶다면 .defaultSuccessUrl 를 사용하면 된다.
+
+```java
+@Configuration
+public class WebAuthorizationConfig {
+
+    @Bean
+    protected SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+
+        http.formLogin().defaultSuccessUrl("/home", true);
+        http.authorizeRequests().anyRequest().authenticated();
+	
+        );
+
+        return http.build();
+    }
+
+}
+```
+
+더 세부적인 맞춤 구성이 필요하다면 **AuthenticationSuccessHandler 및 AuthenticationFailureHandler** 객체를 이용할 수 있다.
+
+## AuthenticationSuccessHandler 구현
+
+```java
+@Component
+public class CustomAuthenticationSuccessHandler implements AuthenticationSuccessHandler {
+
+    @Override
+    public void onAuthenticationSuccess(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, Authentication authentication) throws IOException {
+        var authorities = authentication.getAuthorities();
+
+        var auth = authorities.stream()
+                    .filter(a -> a.getAuthority().equals("read"))
+                    .findFirst();
+
+        if (auth.isPresent()) { // read 권한이 있으면 /home 으로 리다이렉션
+            httpServletResponse.sendRedirect("/home");
+        } else {
+            httpServletResponse.sendRedirect("/error");
+        }
+    }
+}
+```
+
+## **AuthenticationFailureHandler 구현**
+
+```java
+@Component
+public class CustomAuthenticationFailureHandler implements AuthenticationFailureHandler {
+
+    @Override
+    public void onAuthenticationFailure(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, AuthenticationException e)  {
+        httpServletResponse.setHeader("failed", LocalDateTime.now().toString());
+    }
+}
+```
+
+핸들러를 만들어 줬으니 구성 클래스에 핸들러 객체를 등록해준다.
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Autowired
+    private CustomAuthenticationSuccessHandler authenticationSuccessHandler;
+
+    @Autowired
+    private CustomAuthenticationFailureHandler authenticationFailureHandler;
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.formLogin()
+            .successHandler(authenticationSuccessHandler)
+            .failureHandler(authenticationFailureHandler)
+        .and()
+            .httpBasic();
+
+        http.authorizeRequests()
+                .anyRequest().authenticated();
+    }
+}
+```
+
+# 사용자 권한을 기준으로 모든 엔드포인트에 접근 제한
+
+hasAuthority() - 애플리케이션이 제한을 구성하는 하나의 권한만 매개변수로 받는다. 해당 권한이 있는 사용자만 엔드포인트를 호출할 수 있다.
+
+hasAnyAuthority() - 애플리케이션이 제한을 구성하는 권한을 하나 이상 받을 수 있다. 개인적으로 이 메서드를 주어진 권한중 하나만 해당하면 이라고 외웠다.
+
+access() - SpEl 을 기반으로 권한 부여 규칙을 정한다. 권장방식은 아니니 이런 방법이 있다고 알아두자.
+
+## access() 사용 예제
+
+```java
+@Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+				// 사용자에게 읽기 권한이 있어야 하지만 삭제 권한은 없어야 함을 알림
+        String expression = "hasAuthority('read') and !hasAuthority('delete')";
+        http.authorizeRequests()
+                .anyRequest().access(expression);
+    }
+```
+
+# 사용자 역할을 기준으로 모든 엔드포인트에 대한 접근을 제한
+
+hasRole() - 애플리케이션이 요청을 승인할 하나의 역할 이름을 매개변수로 받는다.
+
+hasAnyRole() - 애플리케이션이 요청을 승인할 여러 역할 이름을 매개변수로 받는다.
+
+access() - SpEl 을 기반으로 권한 부여 규칙을 정한다.
+
+authorities() 를 사용하면 앞에 “ROLE_ “ 접두사를 포함해야 하지만 roles() 메서드를 사용하면 접두사를 포함하지 않아도 된다. 이유는 구현체를 보면 알 수 있다.
+
+- User.class 메서드 구현 보기
+
+    ```java
+    public UserBuilder roles(String... roles) {
+                List<GrantedAuthority> authorities = new ArrayList(roles.length);
+                String[] var3 = roles;
+                int var4 = roles.length;
+    
+                for(int var5 = 0; var5 < var4; ++var5) {
+                    String role = var3[var5];
+                    Assert.isTrue(!role.startsWith("ROLE_"), () -> {
+                        return role + " cannot start with ROLE_ (it is automatically added)";
+                    });
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                }
+    
+                return this.authorities((Collection)authorities);
+            }
+    
+    public UserBuilder authorities(GrantedAuthority... authorities) {
+                return this.authorities((Collection)Arrays.asList(authorities));
+            }
+    
+    public UserBuilder authorities(Collection<? extends GrantedAuthority> authorities) {
+                this.authorities = new ArrayList(authorities);
+                return this;
+            }
+    ```
+
+
+# roles() 메서드 사용
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    @Bean
+    public UserDetailsService userDetailsService() {
+        var manager = new InMemoryUserDetailsManager();
+
+        var user1 = User.withUsername("john")
+                        .password("12345")
+                        .roles("ADMIN")
+                        .build();
+
+        var user2 = User.withUsername("jane")
+                        .password("12345")
+                        .roles("MANAGER")
+                        .build();
+
+        manager.createUser(user1);
+        manager.createUser(user2);
+
+        return manager;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return NoOpPasswordEncoder.getInstance();
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests().anyRequest().hasRole("ADMIN");
+    }
+}
+```
+
+# authorities() 사용
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    @Bean
+    public UserDetailsService userDetailsService() {
+        var manager = new InMemoryUserDetailsManager();
+
+        var user1 = User.withUsername("john")
+                        .password("12345")
+                        .authorities("ROLE_ADMIN")
+                        .build();
+
+        var user2 = User.withUsername("jane")
+                        .password("12345")
+                        .authorities("ROLE_MANAGER")
+                        .build();
+
+        manager.createUser(user1);
+        manager.createUser(user2);
+
+        return manager;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return NoOpPasswordEncoder.getInstance();
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests().anyRequest().hasRole("ADMIN");
+    }
+}
+```
+
+# access() 는 언제 활용할까???
+
+지금까지 권한 부여, 역할 부여만 알아봤지만 이벤트 로그인등 특수한 상황에 활용이 가능하다.
+
+예로 정오 이후에만 엔드포인트 접근을 활용할 수 있다.
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    @Bean
+    public UserDetailsService userDetailsService() {
+        var manager = new InMemoryUserDetailsManager();
+
+        var user1 = User.withUsername("john")
+                .password("12345")
+                .authorities("read")
+                .build();
+
+        var user2 = User.withUsername("jane")
+                .password("12345")
+                .authorities("read", "write", "delete")
+                .build();
+
+        manager.createUser(user1);
+        manager.createUser(user2);
+
+        return manager;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return NoOpPasswordEncoder.getInstance();
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests()
+                .anyRequest().access("T(java.time.LocalTime).now().isAfter(T(java.time.LocalTime).of(12, 0))");
+    }
+}
+```
+
+# 모든 엔드포인트에 대한 접근 제한
+
+- denyAll() - 모든 요청 엑세스를 허용
+- permitAll() - 모든 요청 엑세스를 거부
+- authenticated() - 인증된 사용자만 요청 엑세스 허용
+
+## 모든 엔드포인트 접근은 언제 사용할까???
+
+다음에 생각하기 편하게 미리 상황을 생각해 적어봄.
+
+1. 경로 변수로 이메일을 받는다고 했을때 com 요청이면 허용 net이면 허용하지 않음.
+2. 게이트웨이를 사용해 서버를 구성했을때 특정 마이크로 서비스에 해당하는 것만 허용하고 나머진 denyAll() 처리한다.
+
+
+# 시큐리티 권한 부여 : 제한 적용
+운영 단계 애플리케이션에선 모든 요청이 동일한 규칙을 적용하는 경우는 많지 않고, 일부 엔드포인트는 특정 사용자만 호출할 수 있고 나머지 엔드포인트는 모든 사용자가 호출할 수 있는 경우가 많다.
+
+- MVC 선택기 - 경로에 MVC 식을 이용해 엔드포인트를 선택한다.
+- 앤트 선택기 - 경로에 앤트 식을 이용해 엔드포인트를 선택한다.
+- 정규식 선택기 - 경로에 정규식(regex)을 이용해 엔드포인트를 선택한다.
+
+# MVC 선택기
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    @Bean
+    public UserDetailsService userDetailsService() {
+        var manager = new InMemoryUserDetailsManager();
+
+        var user1 = User.withUsername("john")
+                .password("12345")
+                .roles("ADMIN")
+                .build();
+
+        var user2 = User.withUsername("jane")
+                .password("12345")
+                .roles("MANAGER")
+                .build();
+
+        manager.createUser(user1);
+        manager.createUser(user2);
+
+        return manager;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return NoOpPasswordEncoder.getInstance();
+    }
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests()
+                .mvcMatchers("/hello").hasRole("ADMIN")
+                .mvcMatchers("/ciao").hasRole("MANAGER")
+                .anyRequest().permitAll();
+                //.anyRequest().denyAll();
+                //.anyRequest().authenticated();
+    }
+
+		//첫번째 시나리오
+		@Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests()
+                .mvcMatchers(HttpMethod.GET, "/a")
+								.authenticated() // HTTP GET 방식으로 /a 경로를 요청하면 앱이 사용자를 인증해야한다.
+                .mvcMatchers(HttpMethod.POST, "/a")
+								.permitAll() // HTTP POST 방식 /a 경로 요청은 모두 허용
+                .anyRequest().denyAll(); // 나머지 요청 모두 거부
+
+        http.csrf().disable();
+    }
+
+		//두번째 시나리오
+		@Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests()
+                .mvcMatchers( "/a/b/**").authenticated() // /a/b 붙은 모든 경로 인증필요.
+                .anyRequest().permitAll();
+
+        http.csrf().disable();
+    }
+
+		// 세번째 시나리오
+		@Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http.httpBasic();
+
+        http.authorizeRequests()
+                .mvcMatchers( "/product/{code:^[0-9]*$}").permitAll() // 길이상관없이 숫자를 포함하는 문자열
+                .anyRequest().denyAll();
+    }
+}
+```
+
+# 앤트 선택기 208p.
+
+최대한 MVC 선택기를 이용하는것이 좋다. MVC 선택기를 이용하면 스프링의 경로 및 작업 매핑과 관련한 몇 가지 위험을 예방할 수 있다. 그 이유는 권한 부여 규칙을 위해 경로를 해석하는 방법과 스프링이 경로를 엔드포인트에 매핑하기 위해 해석하는 방법이 같기 때문이다. 반면 앤트 선택기를 이용하려면 권한 부여 규칙을 적용할 모든 경로에 확실하게 적용되게 식을 작성해야 한다.
+
+### 앤트 선택기는 확실하게 적용되게 식을 작성해라????
+
+간단하면서도 보안의 관점에서 상당한 영향을 미치는 사례로 스프링은 동일한 작업에 대한 모든 경로에(`/hello`) 대해 경로 뒤에 다른 /를 추가해도 해석할 수 있다. 이 경우 `/hello` 와 `/hello/` 는 같은 메서드를 호출한다.  MVC 선택기로  `/hello`  경로에 대한 보안을 구성하면 `/hello/` 경로도 자동으로 같은 규칙으로 보호ㅛ6된다. 앤트는 그렇지 않다. 이를 모르면 의도치 않게 경로를 보호되지 않는 상태로 방치할 수 있다.
+
+# 정규식 선택기 213p.
+
+MVC 선택기와 앤트 선택기로 구현할 수 없는 복잡한 선택기 구현이 필요하면 사용한다.
+
+# 권한 필터 수행 순서
+엔드포인트를 모두 접근할 수 있게 설계했다면 인증을 위한 사용자 이름과 암호를 제공하지 않아도 호출할 수 있고, 이 경우는 시큐리티는 인증을 수행하지 않는다. 하지만 굳이 사용자 이름과 암호를 제공했다면 스프링 시큐리티는 인증 프로세스에서 이를 확인하며, 확인되지 않으면(로그인 실패) 인증이 실패한다 (401)
+
+사용자 확인이 되었지만 권한에서 문제가 생길경우 403에러를 발생한다. 이렇듯 어떠한 문제가 생겼을때 기대하는 에러코드가 정해져 있기에 커스텀해 사용할땐 이런 부분도 신경써야 한다.
+
+즉. 시큐리티는 권한 필터보다 인증 필터를 먼저 실행한다.
+![시큐리티 필터 순서](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/740b2a16-0951-4143-b936-e9669b968d6f/Untitled.png)
+
+시큐리티 필터 순서
+
+# 체인에서 기존 필터 뒤,앞 필터 추가
+
+필터 체인에서 기존 필터 뒤,앞에 맞춤형 필터를 추가하는 과정은 기존 필터 다음에 원하는 논리를 실행할때 사용한다.
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+				
+        // 필터 체인에서 BasicAuthenticationFilter 앞에 RequestValidationFilter 를 추가한다.
+        http.addFilterBefore(
+                new RequestValidationFilter(),
+                BasicAuthenticationFilter.class)
+                // BasicAuthenticationFilter 뒤에 AuthenticationLoggingFilter 를 추가한다.
+            .addFilterAfter(
+                new AuthenticationLoggingFilter(),
+                BasicAuthenticationFilter.class)
+            .authorizeRequests()
+                .anyRequest()
+                    .permitAll();
+    }
+}
+```
+
+위 코드를 실행한다고 가정해보면 `RequestValidationFilter` 가 먼저 실행되고 요청이 정상적이라면  `BasicAuthenticationFilter` 가 실행된다. `BasicAuthenticationFilter` 가 끝나면 `AuthenticationLoggingFilter` 가 실행되기에 로그가 남겨진다.
+
+# 주의!!!
+
+**addFilterAt - 지정된 필터의 순서에 커스텀 필터 추가**
+
+기존 필터의 위치에 다른 필터를 적용하면 필터가 대체된다고 생각할 수 있지만 그렇지 않다. 같은 위치에 여러 필터를 추가하면 필터가 실행되는 순서가 보장되지 않는다. 순서가 정해져 있는것이 이치에 맞다. 순서를 알아야 논리를 이해하고 유지 관리하기 쉽다.
