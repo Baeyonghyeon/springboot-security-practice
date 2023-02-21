@@ -732,3 +732,73 @@ public class ProjectConfig extends WebSecurityConfigurerAdapter {
 **addFilterAt - 지정된 필터의 순서에 커스텀 필터 추가**
 
 기존 필터의 위치에 다른 필터를 적용하면 필터가 대체된다고 생각할 수 있지만 그렇지 않다. 같은 위치에 여러 필터를 추가하면 필터가 실행되는 순서가 보장되지 않는다. 순서가 정해져 있는것이 이치에 맞다. 순서를 알아야 논리를 이해하고 유지 관리하기 쉽다.
+
+# CORS
+기본적으로 브라우저는 사이트가 로드된 도메인 이외의 도메인에 대한 요청을 허용하지 않는다.
+애플리케이션이 두 개의 서로 다른 도메인 간에 호출하는 것은 모두 금지된다. 그러나 그러한 호출이 필요할 때가 있다. 이때 CORS를 이용하면 애플리케이션이 요청을 허용할 도메인, 그리고 공유할 수 있는 세부 정보를 지정할 수 있다. CORS 메커니즘은 HTTP 헤더를 기반으로 작동하며 가장 중요한 헤더는 다음과 같다!!
+
+- **Access-Control-Allow-Origin**
+  - 도메인의 리소스에 접근할 수 있는 외부 도메인(원본)을 지정한다.
+- **Access_Control-Allow-Methods**
+  - 다른 도메인에 대해 접근을 허용하지만 특정 HTTP 방식만 허용하고 싶을 때 일부 HTTP 방식을 지정할 수 있다. 예를 들어 [example.com](http://example.com)이 일부 엔드포인트를 호출할 수 있게 하면서 HTTP GET만 허용할 수 있다.
+- **Access-Control-Allow-Headers**
+  - 특정 요청에 이용할 수 있는 헤더에 제한을 추가한다.
+
+
+## 애플리케이션에서 CORS를 구성하지 않고 교차 출처를 호출하면 어떤 일이 생길까???
+
+애플리케이션은 요청을 응답받을 때 여기에 서버가 수락하는 출처가 나열된 Access-Control-Allow-Origin 헤더가 있다고 예상한다. 스프링 시큐리티의 기본 동작과 같이 이 헤더가 없으면 브라우저는 응답을 수락하지 않는다.
+
+# 1. `@CorssOrigin` 어노테이션으로 CORS 정책 적용
+
+`@CorssOrigin` 어노테이션으로 다른 도메인에서의 요청을 허용하도록 CORS를 구성하는 방법이 있다. 엔드포인트 정의하는 메서드 바로 위에 배치하고 허용된 출처와 메서드를 이용해 구성할 수 있다.
+
+```java
+@PostMapping("/test")
+    @ResponseBody
+    @CrossOrigin("http://localhost:8080") // 어노테이션으로 CORS 정책 적용
+    public String test() {
+        logger.info("Test method called");
+        return "HELLO";
+    }
+```
+
+- 장점 : 엔드포인트가 정의되는 위치에서 직접 규칙을 지정하면 규칙이 투명해진다.
+- 단점 : 코드가 장황해지고 많은 코드를 반복해야 할 수 있다. 또한 새로 구현하는 엔드포인트에 어노테이션 추가를 잊어버릴 수도 있다.
+
+CORS 구성을 한곳에서 정의해야 한다면 해당 어노테이션을 이용하자!
+
+# 2. `CorsConfigurer` 로 CORS 적용
+
+```java
+@Configuration
+public class ProjectConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+
+				// cors()를 호출해 CORS 구성을 정의한다. 여기에 허용되는 출처와 메서드를 설정하는 CorsConfiguration 객체를 생성한다.
+        http.cors(c -> {
+            CorsConfigurationSource source = request -> {
+                CorsConfiguration config = new CorsConfiguration();
+                config.setAllowedOrigins(List.of("*"));
+                config.setAllowedMethods(List.of("*"));
+                return config;
+            };
+            c.configurationSource(source);
+        });
+
+        http.csrf().disable();
+
+        http.authorizeRequests()
+                .anyRequest().permitAll();
+    }
+}
+```
+
+`cors()` 는 `Customizer<CorsConfigurer>` 객체를 매개 변수로 받는다.
+이 객체를 위해 HTTP 요청의 `CorsConfiguration` 을 반환하는 `CorsConfigurationSource`를 설정했다.
+
+`CorsConfigurationSource`은 허용되는 출처, 메서드, 헤더를 지정하는 객체다. 이 방식을 이용하려면 최소한 허용할 출처와 메서드를 지정해야 하며 출처만 지정하면 애플리케이션이 요청을 허용하지 않는다.
+
+람다로 구현했지만 실제 애플리케이션을 작성할땐 클래스 분리를 꼭 하자!!!
