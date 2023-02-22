@@ -1,6 +1,9 @@
 # 인증 서버 구현
 간단하게 인증서버를 만들어본다.
 
+SpringBoot version : 3.0.2  
+java version : 17
+
 
 ## Controller
 - /user/add
