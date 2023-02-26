@@ -801,4 +801,4 @@ public class ProjectConfig extends WebSecurityConfigurerAdapter {
 
 `CorsConfigurationSource`은 허용되는 출처, 메서드, 헤더를 지정하는 객체다. 이 방식을 이용하려면 최소한 허용할 출처와 메서드를 지정해야 하며 출처만 지정하면 애플리케이션이 요청을 허용하지 않는다.
 
-람다로 구현했지만 실제 애플리케이션을 작성할땐 클래스 분리를 꼭 하자!!!
+람다로 구현했지만 실제 애플리케이션을 작성할땐 클래스 분리를 꼭 하자!!!!
