@@ -8,6 +8,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
@@ -18,16 +20,13 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+@RequiredArgsConstructor
 public class InitialAuthenticationFilter extends OncePerRequestFilter {
 
     public final AuthenticationManager authenticationManager;
 
     @Value("${jwt.signing.key}")
     private String signingKey;
-
-    public InitialAuthenticationFilter(AuthenticationManager authenticationManager) {
-        this.authenticationManager = authenticationManager;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -42,7 +41,7 @@ public class InitialAuthenticationFilter extends OncePerRequestFilter {
 
         // 클라이언트가 OTP 를 보냈다고 가정.
         Authentication a = new OtpAuthentication(username, code);
-        a = authenticationManager.authenticate(a);
+        authenticationManager.authenticate(a);
 
         SecretKey key = Keys.hmacShaKeyFor(signingKey.getBytes(StandardCharsets.UTF_8));
 
