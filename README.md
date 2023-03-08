@@ -1,5 +1,5 @@
 # Spring Security In Action java 17로 바꾸기
-![](/Users/a000/Desktop/Untitled.png) 
+![](/Users/a000/Desktop/Untitled.png)  
 
 ## Security 5.4.0 이후 변화 (WebSecurityConfigurerAdapter 안쓰게 되면서)
 - [Authorize HttpServletRequests 로 변경](https://docs.spring.io/spring-security/reference/servlet/authorization/authorize-http-requests.html)
